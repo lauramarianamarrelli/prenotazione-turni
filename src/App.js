@@ -20,6 +20,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [turni, setTurni] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
+  const [loading, setLoading] = useState(false); // Stato di caricamento
+  const [error, setError] = useState(null); // Stato di errore
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
@@ -48,8 +50,17 @@ function App() {
   }, [user]);
 
   const login = async () => {
+    setLoading(true); // Mostra che il login è in corso
+    setError(null); // Reset dell'errore
     const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error("Errore durante il login:", err);
+      setError("Si è verificato un errore durante il login. Per favore riprova.");
+    } finally {
+      setLoading(false); // Termina il caricamento
+    }
   };
 
   const chiediNomeCognome = async () => {
@@ -176,12 +187,17 @@ function App() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-tr from-white to-blue-100">
         <h1 className="text-4xl font-bold mb-6 text-[#8C1515] tracking-tight">Prenotazione Turni</h1>
         <p className="text-gray-600 mb-4">Accedi con la tua email UniRoma1 per prenotarti</p>
-        <button
-          onClick={login}
-          className="px-6 py-3 bg-[#8C1515] text-white rounded-lg text-lg font-medium hover:bg-[#6d1010] transition shadow"
-        >
-          Login con email UniRoma1
-        </button>
+        {loading ? (
+          <p>Caricamento...</p>
+        ) : (
+          <button
+            onClick={login}
+            className="px-6 py-3 bg-[#8C1515] text-white rounded-lg text-lg font-medium hover:bg-[#6d1010] transition shadow"
+          >
+            Login con email UniRoma1
+          </button>
+        )}
+        {error && <p className="text-red-500">{error}</p>}
       </div>
     );
   }
@@ -191,8 +207,6 @@ function App() {
       <h1 className="titolo-principale">
         Prenotazione Turni Sala Operatoria
       </h1>
-
-
       {turniPrenotati.length > 0 && (
         <div className="lista-turni max-w-xl mx-auto mb-8">
           <h2 className="text-lg font-semibold text-green-700 mb-2">I tuoi turni prenotati:</h2>
@@ -261,6 +275,11 @@ function App() {
         })}
       </div>
     </div>
+  );
+}
+
+export default App;
+
   );
 }
 
