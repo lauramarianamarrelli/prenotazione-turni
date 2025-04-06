@@ -40,10 +40,16 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(collection(db, 'turni'), (snapshot) => {
-      const dati = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setTurni(dati);
-    });
+    const unsub = onSnapshot(
+      collection(db, 'turni'),
+      (snapshot) => {
+        const dati = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setTurni(dati);
+      },
+      (error) => {
+        console.error('❌ Errore nel caricamento dei turni:', error);
+      }
+    );
     return () => unsub();
   }, [user]);
 
@@ -54,8 +60,8 @@ function App() {
     try {
       await signInWithPopup(auth, provider);
     } catch (err) {
-      console.error(err);
-      setError("Errore durante il login.");
+      console.error("Errore durante il login:", err);
+      setError("Si è verificato un errore durante il login. Per favore riprova.");
     } finally {
       setLoading(false);
     }
@@ -71,56 +77,51 @@ function App() {
 
   const inviaEmail = (email, nome, data) => {
     if (!email) return;
-    emailjs.send(SERVICE_ID, TEMPLATE_ID, {
-      to_email: email,
-      nome,
-      data
-    }, USER_ID).catch(console.error);
-  };
-
-  const entroOre = (dataString, ore) => {
-    const now = new Date();
-    const dataTurno = new Date(dataString + "T00:00");
-    const diffOre = (dataTurno - now) / (1000 * 60 * 60);
-    return diffOre <= ore;
+    emailjs
+      .send(SERVICE_ID, TEMPLATE_ID, {
+        to_email: email,
+        nome,
+        data
+      }, USER_ID)
+      .then((response) => {
+        console.log("✅ Email inviata con successo:", response.status, response.text);
+      })
+      .catch((error) => {
+        console.error("❌ Errore nell'invio dell'email:", error);
+      });
   };
 
   const gestisciPrenotazione = async (turnoId) => {
     const turnoRef = doc(db, 'turni', turnoId);
     const turnoSnap = await getDoc(turnoRef);
     const turno = turnoSnap.data();
-    const partecipanti = turno.partecipanti || [];
-    const attesa = turno.attesa || [];
-    let nomeUtente = userInfo?.nome;
 
+    let nomeUtente = userInfo?.nome;
     if (!nomeUtente) {
       nomeUtente = await chiediNomeCognome();
       if (!nomeUtente) return;
     }
 
+    const partecipanti = turno.partecipanti || [];
+    const attesa = turno.attesa || [];
+
     const isInPartecipanti = partecipanti.some(p => p.uid === user.uid);
     const isInAttesa = attesa.some(p => p.uid === user.uid);
 
-    if (isInPartecipanti && entroOre(turno.data, 48)) {
-      alert("Non puoi annullare la prenotazione nelle 48h precedenti al turno.");
-      return;
-    }
-    if (isInAttesa && entroOre(turno.data, 24)) {
-      alert("Non puoi uscire dalla lista d’attesa nelle 24h precedenti al turno.");
-      return;
-    }
-
     const tuttePrenotazioni = await Promise.all(
-      turni.map(async t => {
+      turni.map(async (t) => {
         const ref = doc(db, 'turni', t.id);
         const snap = await getDoc(ref);
         return { id: t.id, ref, dati: snap.data() };
       })
     );
 
-    if (!isInPartecipanti && tuttePrenotazioni.some(t =>
-      t.id !== turnoId && t.dati.partecipanti?.some(p => p.uid === user.uid))) {
-      alert("Sei già prenotato in un altro turno.");
+    const giàPrenotatoAltrove = tuttePrenotazioni.some(t =>
+      t.id !== turnoId && t.dati.partecipanti?.some(p => p.uid === user.uid)
+    );
+
+    if (!isInPartecipanti && giàPrenotatoAltrove) {
+      alert("Sei già prenotato in un altro turno e non puoi iscriverti alla lista d'attesa.");
       return;
     }
 
@@ -131,11 +132,15 @@ function App() {
       if (attesa.length > 0) {
         nuovoPartecipante = attesa[0];
         nuoviPartecipanti.push(nuovoPartecipante);
-        inviaEmail(nuovoPartecipante.email, nuovoPartecipante.nome, turno.data);
+
+        // ✅ Invia email a chi viene promosso dalla lista d'attesa
+        if (nuovoPartecipante?.email && nuovoPartecipante?.nome) {
+          inviaEmail(nuovoPartecipante.email, nuovoPartecipante.nome, turno.data);
+        }
 
         for (const t of tuttePrenotazioni) {
-          if (t.id !== turnoId) {
-            const nuovaLista = t.dati.attesa?.filter(p => p.uid !== nuovoPartecipante.uid) || [];
+          if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === nuovoPartecipante.uid)) {
+            const nuovaLista = t.dati.attesa.filter(p => p.uid !== nuovoPartecipante.uid);
             await updateDoc(t.ref, { attesa: nuovaLista });
           }
         }
@@ -146,57 +151,65 @@ function App() {
         attesa: attesa.slice(nuovoPartecipante ? 1 : 0)
       });
 
-      alert("Hai annullato la prenotazione.");
+      alert('Hai annullato la prenotazione.');
 
     } else if (isInAttesa) {
       await updateDoc(turnoRef, {
         attesa: attesa.filter(p => p.uid !== user.uid)
       });
-      alert("Sei stato rimosso dalla lista d’attesa.");
+      alert('Sei stato rimosso dalla lista d’attesa.');
 
     } else if (partecipanti.length < 3) {
       const nuovo = { uid: user.uid, nome: nomeUtente, email: user.email };
       await updateDoc(turnoRef, {
         partecipanti: [...partecipanti, nuovo]
       });
+      alert('Prenotazione effettuata con successo!');
       inviaEmail(user.email, nomeUtente, turno.data);
 
       for (const t of tuttePrenotazioni) {
-        if (t.id !== turnoId) {
-          const nuovaLista = t.dati.attesa?.filter(p => p.uid !== user.uid) || [];
+        if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === user.uid)) {
+          const nuovaLista = t.dati.attesa.filter(p => p.uid !== user.uid);
           await updateDoc(t.ref, { attesa: nuovaLista });
         }
       }
 
-      alert("Prenotazione effettuata!");
-
-    } else if (attesa.length < 5) {
+    } else if (attesa.length < 5 && !giàPrenotatoAltrove) {
       const nuovo = { uid: user.uid, nome: nomeUtente, email: user.email };
       await updateDoc(turnoRef, {
         attesa: [...attesa, nuovo]
       });
-      alert("Turno pieno. Sei stato inserito in lista d’attesa.");
+      alert('Il turno è pieno. Sei stato inserito in lista d’attesa.');
+
     } else {
-      alert("Turno pieno e lista d’attesa completa.");
+      alert('Turno pieno e lista d’attesa completa, oppure sei già prenotato.');
     }
   };
 
   const turniPrenotati = turni.filter(t =>
-    t.partecipanti?.some(p => p.uid === user?.uid));
+    t.partecipanti?.some(p => p.uid === user?.uid)
+  );
+
   const turniInAttesa = turni.filter(t =>
-    t.attesa?.some(p => p.uid === user?.uid));
+    t.attesa?.some(p => p.uid === user?.uid)
+  );
 
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-tr from-white to-blue-100">
-        <h1 className="text-4xl font-bold mb-6 text-[#8C1515]">Prenotazione Turni</h1>
-        <p className="text-gray-600 mb-4">Accedi con la tua email UniRoma1</p>
-        {loading ? <p>Caricamento...</p> : (
-          <button onClick={login} className="px-6 py-3 bg-[#8C1515] text-white rounded-lg text-lg">
+        <h1 className="text-4xl font-bold mb-6 text-[#8C1515] tracking-tight">Prenotazione Turni</h1>
+        <p className="text-gray-600 mb-4">Accedi con la tua email UniRoma1 per prenotarti</p>
+        {loading ? (
+          <p>Caricamento...</p>
+        ) : (
+          <button
+            onClick={login}
+            className="px-6 py-3 bg-[#8C1515] text-white rounded-lg text-lg font-medium hover:bg-[#6d1010] transition shadow"
+          >
             Login con email UniRoma1
           </button>
         )}
-        {error && <p className="text-red-500 mt-2">{error}</p>}
+        {error && <p className="text-red-500">{error}</p>}
       </div>
     );
   }
@@ -206,8 +219,8 @@ function App() {
       <h1 className="titolo-principale">Prenotazione Turni Sala Operatoria</h1>
 
       {turniPrenotati.length > 0 && (
-        <div className="lista-turni max-w-xl mx-auto mb-6">
-          <h2 className="text-lg font-semibold text-green-700 mb-2">📌 Turni prenotati</h2>
+        <div className="lista-turni max-w-xl mx-auto mb-8">
+          <h2 className="text-lg font-semibold text-green-700 mb-2">I tuoi turni prenotati:</h2>
           <ul className="list-disc list-inside text-gray-700">
             {turniPrenotati.map(t => <li key={t.id}>{t.data}</li>)}
           </ul>
@@ -215,63 +228,75 @@ function App() {
       )}
 
       {turniInAttesa.length > 0 && (
-        <div className="lista-attesa max-w-xl mx-auto mb-6">
-          <h2 className="text-lg font-semibold text-purple-700 mb-2">🔄 In lista d’attesa per:</h2>
+        <div className="lista-attesa max-w-xl mx-auto mb-8">
+          <h2 className="text-lg font-semibold text-purple-700 mb-2">In lista d’attesa:</h2>
           <ul className="list-disc list-inside text-gray-700">
             {turniInAttesa.map(t => <li key={t.id}>{t.data}</li>)}
           </ul>
         </div>
       )}
 
-      {turni.length === 0 ? (
-        <p className="nessun-turno">Nessun turno disponibile.</p>
-      ) : (
-        <div className="grid gap-8 max-w-3xl mx-auto">
-          {turni.map(turno => {
-            const partecipanti = turno.partecipanti || [];
-            const attesa = turno.attesa || [];
-            const isInPartecipanti = partecipanti.some(p => p.uid === user.uid);
-            const isInAttesa = attesa.some(p => p.uid === user.uid);
-            const pieno = partecipanti.length >= 3;
+      {turni.length === 0 && (
+        <p className="text-center text-gray-500 text-lg">Nessun turno disponibile.</p>
+      )}
 
-            return (
-              <div
-                key={turno.id}
-                className={`card-turno ${isInPartecipanti ? 'border-green-500' : isInAttesa ? 'border-purple-500' : ''}`}
-              >
-                <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
-                <div className="text-sm text-gray-600">👥 Posti: {partecipanti.length}/3</div>
-                <div className="text-sm text-gray-600 mb-2">🕓 Lista d’attesa: {attesa.length}/5</div>
-                <div className="text-sm text-gray-700 mb-1"><strong>Prenotati:</strong> {partecipanti.map(p => p.nome).join(', ') || 'Nessuno'}</div>
-                <div className="text-sm text-gray-700 mb-4"><strong>In attesa:</strong> {attesa.map(p => p.nome).join(', ') || 'Nessuno'}</div>
-                <button
-                  onClick={() => gestisciPrenotazione(turno.id)}
-                  disabled={pieno && attesa.length >= 5 && !isInPartecipanti && !isInAttesa}
-                  className={`w-full py-2 rounded-md text-white font-semibold shadow-sm transition ${
-                    isInPartecipanti || isInAttesa
-                      ? 'bg-red-500 hover:bg-red-600'
-                      : pieno
-                      ? attesa.length < 5
-                        ? 'bg-yellow-500 hover:bg-yellow-600'
-                        : 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700'
-                  }`}
-                >
-                  {isInPartecipanti
-                    ? 'Annulla prenotazione'
-                    : isInAttesa
-                    ? 'Esci dalla lista'
+      <div className="grid gap-8 max-w-3xl mx-auto">
+        {turni.map((turno) => {
+          const partecipanti = turno.partecipanti || [];
+          const attesa = turno.attesa || [];
+          const posti = partecipanti.length;
+          const isInPartecipanti = partecipanti.some(p => p.uid === user.uid);
+          const isInAttesa = attesa.some(p => p.uid === user.uid);
+          const pieno = posti >= 3;
+
+          const cardClass = `card-turno ${
+            isInPartecipanti
+              ? 'border-green-500'
+              : isInAttesa
+              ? 'attesa'
+              : ''
+          }`;
+
+          return (
+            <div key={turno.id} className={cardClass}>
+              <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
+              <div className="text-sm text-gray-600">👥 Posti: {posti}/3</div>
+              <div className="text-sm text-gray-600 mb-3">🕓 Lista d’attesa: {attesa.length}/5</div>
+
+              <div className="text-sm mb-1 text-gray-700">
+                <strong>Prenotati:</strong> {partecipanti.map(p => p.nome).join(', ') || 'Nessuno'}
+              </div>
+              <div className="text-sm mb-4 text-gray-700">
+                <strong>In attesa:</strong> {attesa.map(p => p.nome).join(', ') || 'Nessuno'}
+              </div>
+
+              <button
+                onClick={() => gestisciPrenotazione(turno.id)}
+                className={`w-full py-2 rounded-md text-white font-semibold shadow-sm ${
+                  isInPartecipanti || isInAttesa
+                    ? 'bg-red-500 hover:bg-red-600'
                     : pieno
                     ? attesa.length < 5
-                      ? 'Unisciti alla lista'
-                      : 'Pieno'
-                    : 'Prenota'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                      : 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-600 hover:bg-green-700'
+                } transition`}
+                disabled={pieno && attesa.length >= 5 && !isInPartecipanti && !isInAttesa}
+              >
+                {isInPartecipanti
+                  ? 'Annulla prenotazione'
+                  : isInAttesa
+                  ? 'Esci dalla lista'
+                  : pieno
+                  ? attesa.length < 5
+                    ? 'Unisciti alla lista'
+                    : 'Pieno'
+                  : 'Prenota'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
