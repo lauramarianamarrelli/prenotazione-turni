@@ -1,26 +1,26 @@
-/* Sfondo globale Sapienza */
+/* Sfondo globale e font */
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
   background-color: #8C1515;
   color: #fff;
-  line-height: 1.6;
   margin: 0;
   padding: 0;
+  line-height: 1.6;
 }
 
-/* Titoli */
 h1, h2, h3 {
-  color: #000000;
+  font-family: 'Segoe UI', 'Roboto', sans-serif;
   font-weight: bold;
-  letter-spacing: -0.5px;
+  color: #000000;
+  margin-bottom: 1rem;
 }
 
 /* Titolo principale */
-.titolo-principale {
-  font-size: 2.5rem;
-  text-align: center;
+h1.titolo-principale {
+  font-size: 3rem;
   color: #ffffff;
   font-weight: bold;
+  text-align: center;
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
@@ -48,13 +48,12 @@ button {
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
-
 button:hover {
   background-color: #f1f1f1;
   color: #6d1010;
 }
 
-/* Card dei turni - base */
+/* Card dei turni */
 .card-turno {
   background: #fff;
   border-left: 6px solid #ccc;
@@ -63,40 +62,39 @@ button:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
   color: #333;
-  margin-top: 1rem;
+  margin-top: 2rem;
 }
 
-/* Evidenzia turni prenotati */
+/* Turni prenotati */
 .card-turno.border-green-500 {
-  background: #a1cdad; /* sfondo verdino chiaro */
+  background: #e6f5ea;
   border-left: 6px solid #48bb78;
 }
 
-/* Evidenzia turni in attesa */
-.card-turno.attesa {
-  background: #dcc9f5; /* viola chiaro */
-  border-left: 6px solid #7b2cbf;
+/* Turni in lista d’attesa */
+.card-turno.border-purple-500 {
+  background: #f3e8ff;
+  border-left: 6px solid #9f7aea;
 }
 
-/* Card hover */
+/* Hover animazione */
 .card-turno:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
 }
 
-/* Riquadro "I miei turni" */
-.lista-turni,
-.lista-attesa {
+/* Lista dei turni (prenotati e attesa) */
+.lista-turni {
   background: #ffffff;
   padding: 1rem;
   border-radius: 10px;
   border-left: 6px solid #4CAF50;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   color: #333;
-  margin-top: 2rem;
+  margin-bottom: 2rem;
 }
 
-/* Testo "nessun turno" */
+/* Nessun turno */
 .nessun-turno {
   color: #141111;
   font-size: 1.125rem;
@@ -106,8 +104,8 @@ button:hover {
 
 /* Responsive */
 @media (max-width: 600px) {
-  h1 {
-    font-size: 1.8rem;
+  h1.titolo-principale {
+    font-size: 2rem;
   }
 
   button {
