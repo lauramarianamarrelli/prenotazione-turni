@@ -40,16 +40,12 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    const unsub = onSnapshot(
-      collection(db, 'turni'),
-      (snapshot) => {
-        const dati = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setTurni(dati);
-      },
-      (error) => {
-        console.error('❌ Errore nel caricamento dei turni:', error);
-      }
-    );
+    const unsub = onSnapshot(collection(db, 'turni'), (snapshot) => {
+      const dati = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setTurni(dati);
+    }, (error) => {
+      console.error('❌ Errore nel caricamento dei turni:', error);
+    });
     return () => unsub();
   }, [user]);
 
@@ -59,20 +55,25 @@ function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      setLoading(false);
     } catch (err) {
       console.error("Errore durante il login:", err);
       setError("Si è verificato un errore durante il login. Per favore riprova.");
-    } finally {
       setLoading(false);
     }
   };
 
-  const chiediNomeCognome = async () => {
+  const chiediNomeCognomeEmail = async () => {
     const nome = prompt("Inserisci il tuo nome completo (es. Giulia Rossi):");
     if (!nome) return null;
-    await setDoc(doc(db, 'utenti', user.uid), { nome });
-    setUserInfo({ nome });
-    return nome;
+
+    const emailNotifiche = prompt("Inserisci l'email su cui ricevere le notifiche:");
+    if (!emailNotifiche || !emailNotifiche.includes("@")) return null;
+
+    const dati = { nome, emailNotifiche };
+    await setDoc(doc(db, 'utenti', user.uid), dati);
+    setUserInfo(dati);
+    return dati;
   };
 
   const inviaEmail = (email, nome, data) => {
@@ -84,10 +85,10 @@ function App() {
         data
       }, USER_ID)
       .then((response) => {
-        console.log("✅ Email inviata con successo:", response.status, response.text);
+        console.log("Email inviata con successo:", response.status, response.text);
       })
       .catch((error) => {
-        console.error("❌ Errore nell'invio dell'email:", error);
+        console.error("Errore nell'invio dell'email:", error);
       });
   };
 
@@ -96,10 +97,10 @@ function App() {
     const turnoSnap = await getDoc(turnoRef);
     const turno = turnoSnap.data();
 
-    let nomeUtente = userInfo?.nome;
-    if (!nomeUtente) {
-      nomeUtente = await chiediNomeCognome();
-      if (!nomeUtente) return;
+    let datiUtente = userInfo;
+    if (!datiUtente?.nome || !datiUtente?.emailNotifiche) {
+      datiUtente = await chiediNomeCognomeEmail();
+      if (!datiUtente) return;
     }
 
     const partecipanti = turno.partecipanti || [];
@@ -132,11 +133,7 @@ function App() {
       if (attesa.length > 0) {
         nuovoPartecipante = attesa[0];
         nuoviPartecipanti.push(nuovoPartecipante);
-
-        // ✅ Invia email a chi viene promosso dalla lista d'attesa
-        if (nuovoPartecipante?.email && nuovoPartecipante?.nome) {
-          inviaEmail(nuovoPartecipante.email, nuovoPartecipante.nome, turno.data);
-        }
+        inviaEmail(nuovoPartecipante.emailNotifiche, nuovoPartecipante.nome, turno.data);
 
         for (const t of tuttePrenotazioni) {
           if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === nuovoPartecipante.uid)) {
@@ -160,12 +157,17 @@ function App() {
       alert('Sei stato rimosso dalla lista d’attesa.');
 
     } else if (partecipanti.length < 3) {
-      const nuovo = { uid: user.uid, nome: nomeUtente, email: user.email };
+      const nuovo = {
+        uid: user.uid,
+        nome: datiUtente.nome,
+        email: user.email,
+        emailNotifiche: datiUtente.emailNotifiche
+      };
       await updateDoc(turnoRef, {
         partecipanti: [...partecipanti, nuovo]
       });
       alert('Prenotazione effettuata con successo!');
-      inviaEmail(user.email, nomeUtente, turno.data);
+      inviaEmail(nuovo.emailNotifiche, nuovo.nome, turno.data);
 
       for (const t of tuttePrenotazioni) {
         if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === user.uid)) {
@@ -175,7 +177,12 @@ function App() {
       }
 
     } else if (attesa.length < 5 && !giàPrenotatoAltrove) {
-      const nuovo = { uid: user.uid, nome: nomeUtente, email: user.email };
+      const nuovo = {
+        uid: user.uid,
+        nome: datiUtente.nome,
+        email: user.email,
+        emailNotifiche: datiUtente.emailNotifiche
+      };
       await updateDoc(turnoRef, {
         attesa: [...attesa, nuovo]
       });
@@ -216,22 +223,28 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-gray-50 p-6">
-      <h1 className="titolo-principale">Prenotazione Turni Sala Operatoria</h1>
+      <h1 className="titolo-principale">
+        Prenotazione Turni Sala Operatoria
+      </h1>
 
       {turniPrenotati.length > 0 && (
         <div className="lista-turni max-w-xl mx-auto mb-8">
           <h2 className="text-lg font-semibold text-green-700 mb-2">I tuoi turni prenotati:</h2>
           <ul className="list-disc list-inside text-gray-700">
-            {turniPrenotati.map(t => <li key={t.id}>{t.data}</li>)}
+            {turniPrenotati.map(t => (
+              <li key={t.id}>{t.data}</li>
+            ))}
           </ul>
         </div>
       )}
 
       {turniInAttesa.length > 0 && (
-        <div className="lista-attesa max-w-xl mx-auto mb-8">
-          <h2 className="text-lg font-semibold text-purple-700 mb-2">In lista d’attesa:</h2>
-          <ul className="list-disc list-inside text-gray-700">
-            {turniInAttesa.map(t => <li key={t.id}>{t.data}</li>)}
+        <div className="lista-turni max-w-xl mx-auto mb-8 border-l-4 border-purple-600 bg-purple-100 text-purple-900 p-4 rounded">
+          <h2 className="text-lg font-semibold mb-2">Turni in lista d'attesa:</h2>
+          <ul className="list-disc list-inside">
+            {turniInAttesa.map(t => (
+              <li key={t.id}>{t.data}</li>
+            ))}
           </ul>
         </div>
       )}
@@ -249,16 +262,11 @@ function App() {
           const isInAttesa = attesa.some(p => p.uid === user.uid);
           const pieno = posti >= 3;
 
-          const cardClass = `card-turno ${
-            isInPartecipanti
-              ? 'border-green-500'
-              : isInAttesa
-              ? 'attesa'
-              : ''
-          }`;
-
           return (
-            <div key={turno.id} className={cardClass}>
+            <div
+              key={turno.id}
+              className={`card-turno ${isInPartecipanti ? 'border-green-500' : isInAttesa ? 'border-purple-500 bg-purple-100' : ''}`}
+            >
               <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
               <div className="text-sm text-gray-600">👥 Posti: {posti}/3</div>
               <div className="text-sm text-gray-600 mb-3">🕓 Lista d’attesa: {attesa.length}/5</div>
