@@ -55,45 +55,36 @@ function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      setLoading(false);
     } catch (err) {
       console.error("Errore durante il login:", err);
       setError("Si è verificato un errore durante il login. Per favore riprova.");
-      setLoading(false);
     }
+    setLoading(false);
   };
 
-  const chiediDatiUtente = async () => {
-    const nome = prompt("Inserisci il tuo nome completo:");
-    const emailNotifiche = prompt("Inserisci la tua email per ricevere notifiche:");
+  const chiediNomeCognome = async () => {
+    const nome = prompt("Inserisci il tuo nome completo (es. Giulia Rossi):");
+    const emailNotifiche = prompt("Inserisci l'email su cui ricevere conferme:");
     if (!nome || !emailNotifiche) return null;
-    const info = { nome, emailNotifiche };
-    await setDoc(doc(db, 'utenti', user.uid), info);
-    setUserInfo(info);
-    return info;
+    const data = { nome, emailNotifiche };
+    await setDoc(doc(db, 'utenti', user.uid), data);
+    setUserInfo(data);
+    return data;
   };
 
   const inviaEmail = (email, nome, data) => {
     if (!email) return;
     emailjs
-      .send(SERVICE_ID, TEMPLATE_ID, {
-        to_email: email,
-        nome,
-        data
-      }, USER_ID)
-      .then((response) => {
-        console.log("✅ Email inviata:", response.status);
-      })
-      .catch((error) => {
-        console.error("❌ Email fallita:", error);
-      });
+      .send(SERVICE_ID, TEMPLATE_ID, { to_email: email, nome, data }, USER_ID)
+      .then((res) => console.log('📨 Email inviata', res))
+      .catch((err) => console.error('❌ Errore email:', err));
   };
 
-  const entroLeOre = (data, oreLimite) => {
-    const oraTurno = new Date(data + 'T00:00:00');
-    const oraLimite = new Date();
-    oraLimite.setHours(oraLimite.getHours() + oreLimite);
-    return oraTurno <= oraLimite;
+  const entroLeOre = (dataTurno, ore) => {
+    const now = new Date();
+    const turnoData = new Date(`${dataTurno}T00:00:00`);
+    const diffOre = (turnoData - now) / (1000 * 60 * 60);
+    return diffOre <= ore;
   };
 
   const gestisciPrenotazione = async (turnoId) => {
@@ -101,18 +92,16 @@ function App() {
     const turnoSnap = await getDoc(turnoRef);
     const turno = turnoSnap.data();
 
-    let infoUtente = userInfo;
-    if (!infoUtente?.nome || !infoUtente?.emailNotifiche) {
-      const dati = await chiediDatiUtente();
-      if (!dati) return;
-      infoUtente = dati;
+    if (!userInfo?.nome || !userInfo?.emailNotifiche) {
+      const info = await chiediNomeCognome();
+      if (!info) return;
     }
 
     const partecipanti = turno.partecipanti || [];
     const attesa = turno.attesa || [];
+
     const isInPartecipanti = partecipanti.some(p => p.uid === user.uid);
     const isInAttesa = attesa.some(p => p.uid === user.uid);
-    const dataTurno = turno.data;
 
     const tuttePrenotazioni = await Promise.all(
       turni.map(async (t) => {
@@ -127,13 +116,12 @@ function App() {
     );
 
     if (!isInPartecipanti && giàPrenotatoAltrove) {
-      alert("Sei già prenotato in un altro turno e non puoi metterti in lista.");
+      alert("Sei già prenotato in un altro turno e non puoi iscriverti alla lista d'attesa.");
       return;
     }
 
-    // annulla prenotazione
     if (isInPartecipanti) {
-      if (entroLeOre(dataTurno, 48)) {
+      if (entroLeOre(turno.data, 48)) {
         alert("Non puoi annullare la prenotazione nelle 48 ore precedenti.");
         return;
       }
@@ -144,7 +132,7 @@ function App() {
       if (attesa.length > 0) {
         nuovoPartecipante = attesa[0];
         nuoviPartecipanti.push(nuovoPartecipante);
-        inviaEmail(nuovoPartecipante.email, nuovoPartecipante.nome, dataTurno);
+        inviaEmail(nuovoPartecipante.email, nuovoPartecipante.nome, turno.data);
 
         for (const t of tuttePrenotazioni) {
           if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === nuovoPartecipante.uid)) {
@@ -159,26 +147,21 @@ function App() {
         attesa: attesa.slice(nuovoPartecipante ? 1 : 0)
       });
 
-      alert('Prenotazione annullata.');
+      alert('Hai annullato la prenotazione.');
 
     } else if (isInAttesa) {
-      if (entroLeOre(dataTurno, 24)) {
-        alert("Non puoi uscire dalla lista nelle 24 ore precedenti.");
-        return;
-      }
-
       await updateDoc(turnoRef, {
         attesa: attesa.filter(p => p.uid !== user.uid)
       });
-      alert('Sei stato rimosso dalla lista.');
+      alert('Sei stato rimosso dalla lista d’attesa.');
 
     } else if (partecipanti.length < 3) {
-      const nuovo = { uid: user.uid, nome: infoUtente.nome, email: infoUtente.emailNotifiche };
+      const nuovo = { uid: user.uid, nome: userInfo.nome, email: userInfo.emailNotifiche };
       await updateDoc(turnoRef, {
         partecipanti: [...partecipanti, nuovo]
       });
-      inviaEmail(infoUtente.emailNotifiche, infoUtente.nome, dataTurno);
-      alert('Prenotazione effettuata.');
+      alert('Prenotazione effettuata con successo!');
+      inviaEmail(userInfo.emailNotifiche, userInfo.nome, turno.data);
 
       for (const t of tuttePrenotazioni) {
         if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === user.uid)) {
@@ -187,22 +170,23 @@ function App() {
         }
       }
 
-    } else if (attesa.length < 5) {
-      const nuovo = { uid: user.uid, nome: infoUtente.nome, email: infoUtente.emailNotifiche };
+    } else if (attesa.length < 5 && !giàPrenotatoAltrove) {
+      const nuovo = { uid: user.uid, nome: userInfo.nome, email: userInfo.emailNotifiche };
       await updateDoc(turnoRef, {
         attesa: [...attesa, nuovo]
       });
-      alert('Sei stato aggiunto alla lista.');
+      alert('Il turno è pieno. Sei stato inserito in lista d’attesa.');
 
     } else {
-      alert('Turno pieno e lista completa.');
+      alert('Turno pieno e lista d’attesa completa, oppure sei già prenotato.');
     }
   };
 
   const turniPrenotati = turni.filter(t =>
     t.partecipanti?.some(p => p.uid === user?.uid)
   );
-  const turniAttesa = turni.filter(t =>
+
+  const turniInAttesa = turni.filter(t =>
     t.attesa?.some(p => p.uid === user?.uid)
   );
 
@@ -234,26 +218,18 @@ function App() {
         <div className="lista-turni max-w-xl mx-auto mb-8">
           <h2 className="text-lg font-semibold text-green-700 mb-2">I tuoi turni prenotati:</h2>
           <ul className="list-disc list-inside text-gray-700">
-            {turniPrenotati.map(t => (
-              <li key={t.id}>{t.data}</li>
-            ))}
+            {turniPrenotati.map(t => <li key={t.id}>{t.data}</li>)}
           </ul>
         </div>
       )}
 
-      {turniAttesa.length > 0 && (
-        <div className="lista-turni max-w-xl mx-auto mb-8 border-l-4 border-purple-600 bg-purple-50 p-4 rounded">
-          <h2 className="text-lg font-semibold text-purple-700 mb-2">Turni in cui sei in lista d’attesa:</h2>
+      {turniInAttesa.length > 0 && (
+        <div className="lista-turni max-w-xl mx-auto mb-8 border-purple-500">
+          <h2 className="text-lg font-semibold text-purple-700 mb-2">Sei in lista d’attesa per:</h2>
           <ul className="list-disc list-inside text-gray-700">
-            {turniAttesa.map(t => (
-              <li key={t.id}>{t.data}</li>
-            ))}
+            {turniInAttesa.map(t => <li key={t.id}>{t.data}</li>)}
           </ul>
         </div>
-      )}
-
-      {turni.length === 0 && (
-        <p className="text-center text-gray-500 text-lg">Nessun turno disponibile.</p>
       )}
 
       <div className="grid gap-8 max-w-3xl mx-auto">
@@ -268,8 +244,8 @@ function App() {
           return (
             <div
               key={turno.id}
-              className={`card-turno mt-4 ${
-                isInPartecipanti ? 'border-green-500' : isInAttesa ? 'border-purple-500 bg-purple-50' : ''
+              className={`card-turno mt-6 ${
+                isInPartecipanti ? 'border-green-500' : isInAttesa ? 'border-purple-500 bg-purple-100' : ''
               }`}
             >
               <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
@@ -290,7 +266,7 @@ function App() {
                     ? 'bg-red-500 hover:bg-red-600'
                     : pieno
                     ? attesa.length < 5
-                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                      ? 'bg-purple-600 hover:bg-purple-700'
                       : 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700'
                 } transition`}
