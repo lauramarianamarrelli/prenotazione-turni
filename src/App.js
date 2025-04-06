@@ -20,8 +20,8 @@ function App() {
   const [user, setUser] = useState(null);
   const [turni, setTurni] = useState([]);
   const [userInfo, setUserInfo] = useState(null);
-  const [loading, setLoading] = useState(false); // Stato di caricamento
-  const [error, setError] = useState(null); // Stato di errore
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (u) => {
@@ -50,16 +50,16 @@ function App() {
   }, [user]);
 
   const login = async () => {
-    setLoading(true); // Mostra che il login è in corso
-    setError(null); // Reset dell'errore
+    setLoading(true);
+    setError(null);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      setLoading(false); // Login riuscito, fermiamo il caricamento
+      setLoading(false);
     } catch (err) {
       console.error("Errore durante il login:", err);
       setError("Si è verificato un errore durante il login. Per favore riprova.");
-      setLoading(false); // Termina il caricamento anche in caso di errore
+      setLoading(false);
     }
   };
 
@@ -104,6 +104,10 @@ function App() {
     const isInPartecipanti = partecipanti.some(p => p.uid === user.uid);
     const isInAttesa = attesa.some(p => p.uid === user.uid);
 
+    const now = new Date();
+    const dataTurno = new Date(turno.data);
+    const diffOre = (dataTurno - now) / (1000 * 60 * 60);
+
     const tuttePrenotazioni = await Promise.all(
       turni.map(async (t) => {
         const ref = doc(db, 'turni', t.id);
@@ -122,6 +126,11 @@ function App() {
     }
 
     if (isInPartecipanti) {
+      if (diffOre < 48) {
+        alert("Non puoi annullare la prenotazione nelle 48 ore precedenti al turno.");
+        return;
+      }
+
       const nuoviPartecipanti = partecipanti.filter(p => p.uid !== user.uid);
       let nuovoPartecipante = null;
 
@@ -146,6 +155,11 @@ function App() {
       alert('Hai annullato la prenotazione.');
 
     } else if (isInAttesa) {
+      if (diffOre < 24) {
+        alert("Non puoi uscire dalla lista d’attesa nelle 24 ore precedenti al turno.");
+        return;
+      }
+
       await updateDoc(turnoRef, {
         attesa: attesa.filter(p => p.uid !== user.uid)
       });
@@ -204,9 +218,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-gray-50 p-6">
-      <h1 className="titolo-principale">
-        Prenotazione Turni Sala Operatoria
-      </h1>
+      <h1 className="titolo-principale">Prenotazione Turni Sala Operatoria</h1>
+
       {turniPrenotati.length > 0 && (
         <div className="lista-turni max-w-xl mx-auto mb-8">
           <h2 className="text-lg font-semibold text-green-700 mb-2">I tuoi turni prenotati:</h2>
