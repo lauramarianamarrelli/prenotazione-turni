@@ -55,11 +55,11 @@ function App() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      setLoading(false); // Login riuscito, fermiamo il caricamento
     } catch (err) {
       console.error("Errore durante il login:", err);
       setError("Si è verificato un errore durante il login. Per favore riprova.");
-    } finally {
-      setLoading(false); // Termina il caricamento
+      setLoading(false); // Termina il caricamento anche in caso di errore
     }
   };
 
