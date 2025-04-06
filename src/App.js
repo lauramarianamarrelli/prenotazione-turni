@@ -234,7 +234,8 @@ function App() {
           return (
             <div
               key={turno.id}
-              className={card-turno ${isInPartecipanti ? 'border-green-500' : ''}}
+              className={`card-turno ${isInPartecipanti ? 'border-green-500' : ''}`}
+
             >
               <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
               <div className="text-sm text-gray-600">👥 Posti: {posti}/3</div>
