@@ -250,15 +250,16 @@ function App() {
 
               <button
                 onClick={() => gestisciPrenotazione(turno.id)}
-                className={w-full py-2 rounded-md text-white font-semibold shadow-sm ${
+                className={`w-full py-2 rounded-md text-white font-semibold shadow-sm ${
                   isInPartecipanti || isInAttesa
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : pieno
-                    ? attesa.length < 5
-                      ? 'bg-yellow-500 hover:bg-yellow-600'
-                      : 'bg-gray-400 cursor-not-allowed'
-                    : 'bg-green-600 hover:bg-green-700'
-                } transition}
+                  ? 'bg-red-500 hover:bg-red-600'
+                  : pieno
+                  ? attesa.length < 5
+                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                    : 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700'
+                } transition`}
+
                 disabled={pieno && attesa.length >= 5 && !isInPartecipanti && !isInAttesa}
               >
                 {isInPartecipanti
