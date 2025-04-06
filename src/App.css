@@ -1,30 +1,33 @@
-/* Font e struttura */
+/* Sfondo globale Sapienza */
 body {
-  font-family: 'Segoe UI', 'Georgia', serif;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: #8C1515;
   color: #fff;
+  line-height: 1.6;
   margin: 0;
   padding: 0;
-  line-height: 1.6;
 }
 
+/* Titoli */
 h1, h2, h3 {
-  font-family: 'Georgia', serif;
-  font-weight: bold;
   color: #000000;
+  font-weight: bold;
+  letter-spacing: -0.5px;
 }
 
 /* Titolo principale */
-h1.titolo-principale {
-  font-size: 3rem;
-  color: #ffffff !important;
+.titolo-principale {
+  font-size: 2.5rem;
   text-align: center;
+  color: #ffffff;
+  font-weight: bold;
+  margin-top: 2rem;
   margin-bottom: 2rem;
 }
 
 /* Link */
 a {
-  color: #ffdada;
+  color: #ffe6e6;
   text-decoration: none;
 }
 a:hover {
@@ -45,12 +48,13 @@ button {
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
+
 button:hover {
   background-color: #f1f1f1;
   color: #6d1010;
 }
 
-/* Card base */
+/* Card dei turni - base */
 .card-turno {
   background: #fff;
   border-left: 6px solid #ccc;
@@ -59,45 +63,37 @@ button:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   transition: all 0.3s ease;
   color: #333;
+  margin-top: 1rem;
 }
 
-/* Prenotato (verde) */
+/* Evidenzia turni prenotati */
 .card-turno.border-green-500 {
-  background: #d8f4e2;
+  background: #a1cdad; /* sfondo verdino chiaro */
   border-left: 6px solid #48bb78;
 }
 
-/* In lista d’attesa (viola) */
-.card-turno.border-purple-500 {
-  background: #eee0f6;
-  border-left: 6px solid #9b59b6;
+/* Evidenzia turni in attesa */
+.card-turno.attesa {
+  background: #dcc9f5; /* viola chiaro */
+  border-left: 6px solid #7b2cbf;
 }
 
-/* Hover card */
+/* Card hover */
 .card-turno:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
 }
 
-/* Box "I miei turni" */
-.lista-turni {
+/* Riquadro "I miei turni" */
+.lista-turni,
+.lista-attesa {
   background: #ffffff;
   padding: 1rem;
   border-radius: 10px;
   border-left: 6px solid #4CAF50;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   color: #333;
-}
-
-/* Lista attesa */
-.lista-attesa {
-  background: #ffffff;
-  padding: 1rem;
-  border-radius: 10px;
-  border-left: 6px solid #9b59b6;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  color: #333;
-  margin-bottom: 2rem;
+  margin-top: 2rem;
 }
 
 /* Testo "nessun turno" */
