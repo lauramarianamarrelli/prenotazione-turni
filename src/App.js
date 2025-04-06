@@ -234,7 +234,7 @@ function App() {
           return (
             <div
               key={turno.id}
-              className={`card-turno ${isInPartecipanti ? 'border-green-500' : ''}`}
+              className={card-turno ${isInPartecipanti ? 'border-green-500' : ''}}
             >
               <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
               <div className="text-sm text-gray-600">👥 Posti: {posti}/3</div>
@@ -249,7 +249,7 @@ function App() {
 
               <button
                 onClick={() => gestisciPrenotazione(turno.id)}
-                className={`w-full py-2 rounded-md text-white font-semibold shadow-sm ${
+                className={w-full py-2 rounded-md text-white font-semibold shadow-sm ${
                   isInPartecipanti || isInAttesa
                     ? 'bg-red-500 hover:bg-red-600'
                     : pieno
@@ -257,7 +257,7 @@ function App() {
                       ? 'bg-yellow-500 hover:bg-yellow-600'
                       : 'bg-gray-400 cursor-not-allowed'
                     : 'bg-green-600 hover:bg-green-700'
-                } transition`}
+                } transition}
                 disabled={pieno && attesa.length >= 5 && !isInPartecipanti && !isInAttesa}
               >
                 {isInPartecipanti
