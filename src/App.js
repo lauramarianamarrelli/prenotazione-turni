@@ -63,17 +63,14 @@ function App() {
     }
   };
 
-  const chiediNomeCognomeEmail = async () => {
-    const nome = prompt("Inserisci il tuo nome completo (es. Giulia Rossi):");
-    if (!nome) return null;
-
-    const emailNotifiche = prompt("Inserisci l'email su cui ricevere le notifiche:");
-    if (!emailNotifiche || !emailNotifiche.includes("@")) return null;
-
-    const dati = { nome, emailNotifiche };
-    await setDoc(doc(db, 'utenti', user.uid), dati);
-    setUserInfo(dati);
-    return dati;
+  const chiediDatiUtente = async () => {
+    const nome = prompt("Inserisci il tuo nome completo:");
+    const emailNotifiche = prompt("Inserisci la tua email per ricevere notifiche:");
+    if (!nome || !emailNotifiche) return null;
+    const info = { nome, emailNotifiche };
+    await setDoc(doc(db, 'utenti', user.uid), info);
+    setUserInfo(info);
+    return info;
   };
 
   const inviaEmail = (email, nome, data) => {
@@ -85,11 +82,18 @@ function App() {
         data
       }, USER_ID)
       .then((response) => {
-        console.log("Email inviata con successo:", response.status, response.text);
+        console.log("✅ Email inviata:", response.status);
       })
       .catch((error) => {
-        console.error("Errore nell'invio dell'email:", error);
+        console.error("❌ Email fallita:", error);
       });
+  };
+
+  const entroLeOre = (data, oreLimite) => {
+    const oraTurno = new Date(data + 'T00:00:00');
+    const oraLimite = new Date();
+    oraLimite.setHours(oraLimite.getHours() + oreLimite);
+    return oraTurno <= oraLimite;
   };
 
   const gestisciPrenotazione = async (turnoId) => {
@@ -97,17 +101,18 @@ function App() {
     const turnoSnap = await getDoc(turnoRef);
     const turno = turnoSnap.data();
 
-    let datiUtente = userInfo;
-    if (!datiUtente?.nome || !datiUtente?.emailNotifiche) {
-      datiUtente = await chiediNomeCognomeEmail();
-      if (!datiUtente) return;
+    let infoUtente = userInfo;
+    if (!infoUtente?.nome || !infoUtente?.emailNotifiche) {
+      const dati = await chiediDatiUtente();
+      if (!dati) return;
+      infoUtente = dati;
     }
 
     const partecipanti = turno.partecipanti || [];
     const attesa = turno.attesa || [];
-
     const isInPartecipanti = partecipanti.some(p => p.uid === user.uid);
     const isInAttesa = attesa.some(p => p.uid === user.uid);
+    const dataTurno = turno.data;
 
     const tuttePrenotazioni = await Promise.all(
       turni.map(async (t) => {
@@ -122,18 +127,24 @@ function App() {
     );
 
     if (!isInPartecipanti && giàPrenotatoAltrove) {
-      alert("Sei già prenotato in un altro turno e non puoi iscriverti alla lista d'attesa.");
+      alert("Sei già prenotato in un altro turno e non puoi metterti in lista.");
       return;
     }
 
+    // annulla prenotazione
     if (isInPartecipanti) {
+      if (entroLeOre(dataTurno, 48)) {
+        alert("Non puoi annullare la prenotazione nelle 48 ore precedenti.");
+        return;
+      }
+
       const nuoviPartecipanti = partecipanti.filter(p => p.uid !== user.uid);
       let nuovoPartecipante = null;
 
       if (attesa.length > 0) {
         nuovoPartecipante = attesa[0];
         nuoviPartecipanti.push(nuovoPartecipante);
-        inviaEmail(nuovoPartecipante.emailNotifiche, nuovoPartecipante.nome, turno.data);
+        inviaEmail(nuovoPartecipante.email, nuovoPartecipante.nome, dataTurno);
 
         for (const t of tuttePrenotazioni) {
           if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === nuovoPartecipante.uid)) {
@@ -148,26 +159,26 @@ function App() {
         attesa: attesa.slice(nuovoPartecipante ? 1 : 0)
       });
 
-      alert('Hai annullato la prenotazione.');
+      alert('Prenotazione annullata.');
 
     } else if (isInAttesa) {
+      if (entroLeOre(dataTurno, 24)) {
+        alert("Non puoi uscire dalla lista nelle 24 ore precedenti.");
+        return;
+      }
+
       await updateDoc(turnoRef, {
         attesa: attesa.filter(p => p.uid !== user.uid)
       });
-      alert('Sei stato rimosso dalla lista d’attesa.');
+      alert('Sei stato rimosso dalla lista.');
 
     } else if (partecipanti.length < 3) {
-      const nuovo = {
-        uid: user.uid,
-        nome: datiUtente.nome,
-        email: user.email,
-        emailNotifiche: datiUtente.emailNotifiche
-      };
+      const nuovo = { uid: user.uid, nome: infoUtente.nome, email: infoUtente.emailNotifiche };
       await updateDoc(turnoRef, {
         partecipanti: [...partecipanti, nuovo]
       });
-      alert('Prenotazione effettuata con successo!');
-      inviaEmail(nuovo.emailNotifiche, nuovo.nome, turno.data);
+      inviaEmail(infoUtente.emailNotifiche, infoUtente.nome, dataTurno);
+      alert('Prenotazione effettuata.');
 
       for (const t of tuttePrenotazioni) {
         if (t.id !== turnoId && t.dati.attesa?.some(p => p.uid === user.uid)) {
@@ -176,28 +187,22 @@ function App() {
         }
       }
 
-    } else if (attesa.length < 5 && !giàPrenotatoAltrove) {
-      const nuovo = {
-        uid: user.uid,
-        nome: datiUtente.nome,
-        email: user.email,
-        emailNotifiche: datiUtente.emailNotifiche
-      };
+    } else if (attesa.length < 5) {
+      const nuovo = { uid: user.uid, nome: infoUtente.nome, email: infoUtente.emailNotifiche };
       await updateDoc(turnoRef, {
         attesa: [...attesa, nuovo]
       });
-      alert('Il turno è pieno. Sei stato inserito in lista d’attesa.');
+      alert('Sei stato aggiunto alla lista.');
 
     } else {
-      alert('Turno pieno e lista d’attesa completa, oppure sei già prenotato.');
+      alert('Turno pieno e lista completa.');
     }
   };
 
   const turniPrenotati = turni.filter(t =>
     t.partecipanti?.some(p => p.uid === user?.uid)
   );
-
-  const turniInAttesa = turni.filter(t =>
+  const turniAttesa = turni.filter(t =>
     t.attesa?.some(p => p.uid === user?.uid)
   );
 
@@ -223,9 +228,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-gray-50 p-6">
-      <h1 className="titolo-principale">
-        Prenotazione Turni Sala Operatoria
-      </h1>
+      <h1 className="titolo-principale">Prenotazione Turni Sala Operatoria</h1>
 
       {turniPrenotati.length > 0 && (
         <div className="lista-turni max-w-xl mx-auto mb-8">
@@ -238,11 +241,11 @@ function App() {
         </div>
       )}
 
-      {turniInAttesa.length > 0 && (
-        <div className="lista-turni max-w-xl mx-auto mb-8 border-l-4 border-purple-600 bg-purple-100 text-purple-900 p-4 rounded">
-          <h2 className="text-lg font-semibold mb-2">Turni in lista d'attesa:</h2>
-          <ul className="list-disc list-inside">
-            {turniInAttesa.map(t => (
+      {turniAttesa.length > 0 && (
+        <div className="lista-turni max-w-xl mx-auto mb-8 border-l-4 border-purple-600 bg-purple-50 p-4 rounded">
+          <h2 className="text-lg font-semibold text-purple-700 mb-2">Turni in cui sei in lista d’attesa:</h2>
+          <ul className="list-disc list-inside text-gray-700">
+            {turniAttesa.map(t => (
               <li key={t.id}>{t.data}</li>
             ))}
           </ul>
@@ -265,7 +268,9 @@ function App() {
           return (
             <div
               key={turno.id}
-              className={`card-turno ${isInPartecipanti ? 'border-green-500' : isInAttesa ? 'border-purple-500 bg-purple-100' : ''}`}
+              className={`card-turno mt-4 ${
+                isInPartecipanti ? 'border-green-500' : isInAttesa ? 'border-purple-500 bg-purple-50' : ''
+              }`}
             >
               <div className="text-xl font-semibold text-gray-800 mb-1">📅 {turno.data}</div>
               <div className="text-sm text-gray-600">👥 Posti: {posti}/3</div>
