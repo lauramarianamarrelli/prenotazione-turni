@@ -1,39 +1,30 @@
-/* Importa un font moderno e leggibile */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-
-/* Sfondo globale Sapienza */
+/* Font e struttura */
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Segoe UI', 'Georgia', serif;
   background-color: #8C1515;
   color: #fff;
-  line-height: 1.6;
   margin: 0;
   padding: 0;
+  line-height: 1.6;
 }
 
-/* Titoli generici */
 h1, h2, h3 {
-  font-family: 'Inter', sans-serif;
-  color: #000000;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  margin: 0;
+  font-family: 'Georgia', serif;
+  font-weight: bold;
+  color: #fff;
 }
 
-/* Titolo principale personalizzato */
+/* Titolo principale */
 h1.titolo-principale {
-  font-size: 3.2rem;
-  font-weight: 700;
-  color: #ffffff;
+  font-size: 3rem;
+  color: #ffffff !important;
   text-align: center;
-  margin-bottom: 2.5rem;
-  line-height: 1.2;
-  letter-spacing: -0.8px;
+  margin-bottom: 2rem;
 }
 
 /* Link */
 a {
-  color: #ffe6e6;
+  color: #ffdada;
   text-decoration: none;
 }
 a:hover {
@@ -42,7 +33,7 @@ a:hover {
 
 /* Pulsanti */
 button {
-  font-family: 'Inter', sans-serif;
+  font-family: inherit;
   background-color: #ffffff;
   color: #8C1515;
   border: none;
@@ -54,13 +45,12 @@ button {
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
-
 button:hover {
   background-color: #f1f1f1;
   color: #6d1010;
 }
 
-/* Card dei turni - base */
+/* Card base */
 .card-turno {
   background: #fff;
   border-left: 6px solid #ccc;
@@ -71,19 +61,25 @@ button:hover {
   color: #333;
 }
 
-/* Evidenzia turni prenotati */
+/* Prenotato (verde) */
 .card-turno.border-green-500 {
-  background: #d4efe0; /* sfondo verdino tenue */
+  background: #d8f4e2;
   border-left: 6px solid #48bb78;
 }
 
-/* Card hover */
+/* In lista d’attesa (viola) */
+.card-turno.border-purple-500 {
+  background: #eee0f6;
+  border-left: 6px solid #9b59b6;
+}
+
+/* Hover card */
 .card-turno:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
 }
 
-/* Riquadro "I miei turni" */
+/* Box "I miei turni" */
 .lista-turni {
   background: #ffffff;
   padding: 1rem;
@@ -93,9 +89,20 @@ button:hover {
   color: #333;
 }
 
+/* Lista attesa */
+.lista-attesa {
+  background: #ffffff;
+  padding: 1rem;
+  border-radius: 10px;
+  border-left: 6px solid #9b59b6;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  color: #333;
+  margin-bottom: 2rem;
+}
+
 /* Testo "nessun turno" */
 .nessun-turno {
-  color: #eaeaea;
+  color: #141111;
   font-size: 1.125rem;
   text-align: center;
   margin-top: 2rem;
@@ -103,8 +110,8 @@ button:hover {
 
 /* Responsive */
 @media (max-width: 600px) {
-  h1.titolo-principale {
-    font-size: 2.2rem;
+  h1 {
+    font-size: 1.8rem;
   }
 
   button {
